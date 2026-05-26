@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card">
+  <h1 class="hero-title">ข้อมูลนักเรียน</h1>
+  <form class="grid" method="get">
+    <div>
+      <label>ค้นหาเลขบัตร/ชื่อ</label>
+      <input name="q" value="{{q}}" placeholder="พิมพ์เลขบัตรหรือชื่อ">
+    </div>
+    <div>
+      <label>รอบ</label>
+      <select name="round_id">
+        <option value="">ทั้งหมด</option>
+        {% for r in rounds %}
+          <option value="{{r.id}}" {% if r.id==round_id %}selected{% endif %}>{{r.title}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>กรองชั้น</label>
+      <select name="grade">
+        <option value="">ทุกชั้น</option>
+        {% for g in grades %}
+          <option value="{{g}}" {% if g==grade %}selected{% endif %}>{{g}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>กรองห้อง</label>
+      <select name="room">
+        <option value="">ทุกห้อง</option>
+        {% for rm in rooms %}
+          <option value="{{rm}}" {% if rm==room %}selected{% endif %}>{{rm}}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="align-self:end;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn">ค้นหา</button>
+      <a class="btn" href="{{url_for('students')}}">ล้างตัวกรอง</a>
+      <a class="btn green" href="{{url_for('add_student')}}">เพิ่ม</a>
+    </div>
+  </form>
+</div>
+
+<div class="card table-wrap">
+  <div style="margin-bottom:10px;font-weight:700">พบข้อมูล {{students|length}} รายการ</div>
+  <table>
+    <tr>
+      <th>รอบ</th><th>เลขบัตร</th><th>ชื่อ</th><th>ชั้น</th><th>ห้อง</th>
+      <th>นน.อายุ</th><th>สส.อายุ</th><th>นน.สส.</th>
+      <th>ฟันผุ</th><th>เหงือก</th><th>เร่งด่วน</th>
+      <th>กรอกเมื่อ</th><th>แก้ไขเมื่อ</th><th>จัดการ</th>
+    </tr>
+    {% for s in students %}
+    <tr>
+      <td>{{s.round_title}}</td>
+      <td>{{s.id_card}}</td>
+      <td>{{s.name}}</td>
+      <td>{{s.grade}}</td>
+      <td>{{s.room}}</td>
+      <td>{{s.growth_weight_age}}</td>
+      <td>{{s.growth_height_age}}</td>
+      <td>{{s.growth_weight_height}}</td>
+      <td>{{'มี' if s.tooth_decay else 'ไม่มี'}}</td>
+      <td>{{'มี' if s.gum_disease else 'ไม่มี'}}</td>
+      <td>{{'ใช่' if s.urgent else '-'}}</td>
+      <td>{{s.created_at}}</td>
+      <td>{{s.updated_at}}</td>
+      <td class="actions">
+        <a class="btn" href="{{url_for('edit_student',sid=s.id)}}">แก้ไข</a>
+        <form method="post" action="{{url_for('delete_student',sid=s.id)}}" onsubmit="return confirm('ลบข้อมูลนี้?')">
+          <button class="btn red">ลบ</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

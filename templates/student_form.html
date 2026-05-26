@@ -1,0 +1,36 @@
+{% extends 'base.html' %}{% block content %}
+<div class="card"><h2>{% if public %}แบบกรอกข้อมูลนักเรียน{% elif student %}แก้ไขข้อมูล{% else %}เพิ่มข้อมูลนักเรียน{% endif %}</h2>
+<form method="post">
+  <h3>หมวดที่ 1 ข้อมูลส่วนตัว</h3>
+  <div class="grid">
+    <div><label>รอบ</label><select name="round_id" {% if public %}readonly{% endif %}>{% for r in rounds %}<option value="{{r.id}}" {% if student and student.round_id==r.id %}selected{% endif %}>{{r.title}}</option>{% endfor %}</select></div>
+    <div><label>เลขบัตรประชาชน</label><input name="id_card" value="{{student.id_card if student else ''}}" required maxlength="13"></div>
+    <div><label>ชื่อ-สกุล</label><input name="name" value="{{student.name if student else ''}}" required></div>
+    <div><label>วันเกิด</label><input type="date" name="birthdate" value="{{student.birthdate if student else ''}}"></div>
+    <div><label>เพศ</label><select name="gender"><option></option>{% for g in ['ชาย','หญิง'] %}<option {% if student and student.gender==g %}selected{% endif %}>{{g}}</option>{% endfor %}</select></div>
+    <div><label>ชั้น</label><select name="grade"><option></option>{% for g in ['ม.1','ม.2','ม.3','ม.4','ม.5','ม.6'] %}<option {% if student and student.grade==g %}selected{% endif %}>{{g}}</option>{% endfor %}</select></div>
+    <div><label>ห้อง</label><input name="room" value="{{student.room if student else ''}}"></div>
+  </div>
+  <p><label>ที่อยู่</label><textarea name="address">{{student.address if student else ''}}</textarea></p>
+
+  <h3>หมวดที่ 2 โภชนาการ / ภาวะการเจริญเติบโต</h3>
+  <div class="grid">
+    <div><label>น้ำหนัก (กก.)</label><input type="number" step="0.1" name="weight" value="{{student.weight if student else ''}}"></div>
+    <div><label>ส่วนสูง (ซม.)</label><input type="number" step="0.1" name="height" value="{{student.height if student else ''}}"></div>
+    <div><label>รอบเอว (ซม.)</label><input type="number" step="0.1" name="waist" value="{{student.waist if student else ''}}"></div>
+    <div><label>สะโพก (ซม.)</label><input type="number" step="0.1" name="hip" value="{{student.hip if student else ''}}"></div>
+    <div><label>นน.อายุ = น้ำหนักตามอายุ</label><select name="growth_weight_age"><option></option>{% for n in growth_wa %}<option {% if student and student.growth_weight_age==n %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div>
+    <div><label>สส.อายุ = ส่วนสูงตามอายุ</label><select name="growth_height_age"><option></option>{% for n in growth_ha %}<option {% if student and student.growth_height_age==n %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div>
+    <div><label>นน.สส. = น้ำหนักตามส่วนสูง</label><select name="growth_weight_height"><option></option>{% for n in growth_wh %}<option {% if student and student.growth_weight_height==n %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div>
+  </div>
+
+  {% if not public %}
+  <h3>หมวดที่ 3 เฝ้าระวังทันตสุขภาพ</h3>
+  <div class="check-row">
+    <label class="check-card"><input type="checkbox" name="tooth_decay" {% if student and student.tooth_decay %}checked{% endif %}><span>ฟันผุ</span></label>
+    <label class="check-card"><input type="checkbox" name="gum_disease" {% if student and student.gum_disease %}checked{% endif %}><span>เหงือกอักเสบ</span></label>
+    <label class="check-card"><input type="checkbox" name="urgent" {% if student and student.urgent %}checked{% endif %}><span>เร่งด่วน</span></label>
+  </div>
+  <p><label>หมายเหตุ</label><textarea name="note">{{student.note if student else ''}}</textarea></p>{% endif %}
+  <button class="btn">บันทึก</button> {% if not public %}<a class="btn gray" href="{{url_for('students')}}">กลับ</a>{% endif %}
+</form></div>{% endblock %}

@@ -1,0 +1,18 @@
+{% extends 'base.html' %}{% block content %}
+<div class="card">
+  <h1 class="hero-title">แก้ไขรอบการกรอกข้อมูล</h1>
+  <form method="post" class="grid">
+    <div><label>ชื่อรอบ</label><input name="title" value="{{r.title}}" required></div>
+    <div><label>โรงเรียน</label><input name="school" value="{{r.school or ''}}"></div>
+    <div style="grid-column:1/-1"><label>ที่อยู่โรงเรียน</label><input name="school_address" value="{{r.school_address or ''}}" placeholder="บ้านเลขที่/ถนน/หมู่บ้าน"></div>
+    <div><label>หมู่</label><input name="village_no" value="{{r.village_no or ''}}"></div>
+    <div><label>ตำบล</label><input name="subdistrict" value="{{r.subdistrict or ''}}"></div>
+    <div><label>อำเภอ</label><input name="district" value="{{r.district or ''}}"></div>
+    <div><label>จังหวัด</label><input name="province" value="{{r.province or ''}}"></div>
+    <div><label>รหัสไปรษณีย์</label><input name="zipcode" value="{{r.zipcode or ''}}"></div>
+    <div><label>โทรศัพท์</label><input name="phone" value="{{r.phone or ''}}"></div>
+    <div><label>วันที่สำรวจ</label><input type="date" name="survey_date" value="{{r.survey_date or ''}}"></div>
+    <div><label>สถานะ</label><label class="check-card" style="justify-content:flex-start"><input type="checkbox" name="is_open" {% if r.is_open %}checked{% endif %}><span>เปิดให้นักเรียนกรอก</span></label></div>
+    <div style="grid-column:1/-1" class="actions"><button class="btn">บันทึก</button><a class="btn gray" href="{{url_for('rounds')}}">กลับ</a></div>
+  </form>
+</div>{% endblock %}

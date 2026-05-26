@@ -1,0 +1,134 @@
+{% extends 'base.html' %}{% block content %}
+<div class="card no-print">
+  <h2>แดชบอร์ดรายงานผล</h2>
+  <form class="toolbar">
+    <div>
+      <label>เลือกรอบ</label>
+      <select name="round_id" onchange="this.form.submit()">
+        {% for r in rounds %}<option value="{{r.id}}" {% if r.id==round_id %}selected{% endif %}>{{r.title}}</option>{% endfor %}
+      </select>
+    </div>
+  </form>
+  <div class="actions" style="margin-top:12px">
+    <button class="btn gray" type="button" onclick="printDashboardImage()">พิมพ์รายงานแดชบอร์ด</button>
+    <button class="btn green" type="button" onclick="downloadDashboardImage()">บันทึกภาพแดชบอร์ด JPG</button>
+    {% if session.user_id %}<a class="btn green" href="{{url_for('export_excel',round_id=round_id)}}">ดาวน์โหลด Excel พร้อมกราฟ</a>{% endif %}
+  </div>
+</div>
+
+<div id="dashboard-report">
+  <div class="card dashboard-paper">
+    <div class="dash-head">
+      <h2>รายงานแดชบอร์ดภาวะช่องปากและโภชนาการ</h2>
+      <div>รอบ: {% for r in rounds %}{% if r.id==round_id %}{{r.title}}{% endif %}{% endfor %}</div>
+      <div>วันที่ออกรายงาน: {{thai_date(now_date)}}</div>
+    </div>
+
+    <div class="grid kpi-grid">
+      <div class="stat">นักเรียนทั้งหมด<br><b>{{stats.total}}</b></div>
+      <div class="stat">ฟันผุ<br><b>{{stats.decay}}</b><small>{{'%.1f'%(stats.decay*100/stats.total) if stats.total else 0}}%</small></div>
+      <div class="stat">เหงือกอักเสบ<br><b>{{stats.gum}}</b><small>{{'%.1f'%(stats.gum*100/stats.total) if stats.total else 0}}%</small></div>
+      <div class="stat">เร่งด่วน<br><b>{{stats.urgent}}</b><small>{{'%.1f'%(stats.urgent*100/stats.total) if stats.total else 0}}%</small></div>
+    </div>
+
+    <div class="dash-charts">
+      <div class="chart-box"><h3>รายงานตามระดับชั้น</h3><canvas id="bar"></canvas></div>
+      <div class="chart-box"><h3>กราฟภาวะโภชนาการ</h3><canvas id="nut"></canvas></div>
+    </div>
+
+    <div class="summary-box">
+      <h3>ตารางสรุป</h3>
+      <table class="report-table dash-table">
+        <tr><th>ชั้น</th><th>ทั้งหมด</th><th>ฟันผุ</th><th>%</th><th>เหงือกอักเสบ</th><th>%</th><th>เร่งด่วน</th><th>%</th></tr>
+        {% for g,v in stats.by_grade.items() %}
+        <tr>
+          <td>{{g}}</td><td>{{v.total}}</td>
+          <td>{{v.decay}}</td><td>{{'%.1f'%(v.decay*100/v.total) if v.total else 0}}</td>
+          <td>{{v.gum}}</td><td>{{'%.1f'%(v.gum*100/v.total) if v.total else 0}}</td>
+          <td>{{v.urgent}}</td><td>{{'%.1f'%(v.urgent*100/v.total) if v.total else 0}}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+/* ขนาดเอกสารแดชบอร์ดล็อกเป็นสัดส่วน A4 แนวนอน 297:210 */
+#dashboard-report{
+  width:1123px;
+  height:794px;
+  margin:0 auto 20px auto;
+  background:#fff;
+  overflow:hidden;
+}
+.dashboard-paper{
+  width:100%;
+  height:100%;
+  box-sizing:border-box;
+  padding:18px 22px!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  border:1px solid #d0d7e2!important;
+  background:#fff!important;
+  overflow:hidden;
+}
+.dash-head{text-align:center;margin-bottom:8px;line-height:1.35}
+.dash-head h2{margin:0 0 2px 0;font-size:24px}.dash-head div{font-size:14px}
+.kpi-grid{grid-template-columns:repeat(4,1fr);margin-bottom:10px;gap:10px}.kpi-grid .stat{padding:10px!important}.kpi-grid .stat b{font-size:26px!important}.kpi-grid .stat small{display:block;margin-top:1px;color:#475467;font-weight:800}
+.dash-charts{display:grid;grid-template-columns:1.25fr .85fr;gap:12px;align-items:stretch}
+.chart-box{border:1px solid #e5e7eb;border-radius:10px;padding:8px;background:#fff;height:245px;box-sizing:border-box;overflow:hidden}
+.chart-box h3{margin:0 0 4px 0;font-size:16px}.chart-box canvas{height:205px!important;max-height:205px!important}
+.summary-box{margin-top:10px}.summary-box h3{margin:0 0 5px 0;font-size:16px}.dash-table th,.dash-table td{text-align:center!important;padding:4px!important;font-size:13px!important}
+@media(max-width:900px){ #dashboard-report{width:100%;height:auto;overflow:visible}.dashboard-paper{height:auto}.kpi-grid,.dash-charts{grid-template-columns:1fr}.chart-box{height:280px}.chart-box canvas{height:230px!important;max-height:230px!important}}
+@media print{ .no-print,.topbar,.sidebar,.nav-backdrop{display:none!important}.main{margin:0!important;padding:0!important}body{background:#fff!important}#dashboard-report{width:297mm!important;height:210mm!important;margin:0!important}.dashboard-paper{border:0!important}@page{size:A4 landscape;margin:0}}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+const by={{stats.by_grade|tojson}};
+const labels=Object.keys(by);
+const barChart = new Chart(document.getElementById('bar'),{
+  type:'bar',
+  data:{labels,datasets:[
+    {label:'ฟันผุ',data:labels.map(x=>by[x].decay)},
+    {label:'เหงือกอักเสบ',data:labels.map(x=>by[x].gum)},
+    {label:'เร่งด่วน',data:labels.map(x=>by[x].urgent)}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{beginAtZero:true,ticks:{precision:0}}}}
+});
+const nut={{stats.nutrition|tojson}};
+const nutChart = new Chart(document.getElementById('nut'),{
+  type:'doughnut',
+  data:{labels:Object.keys(nut),datasets:[{data:Object.values(nut)}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}}}
+});
+
+function captureDashboard(callback){
+  const target = document.getElementById('dashboard-report');
+  if(!target){ alert('ไม่พบส่วนแดชบอร์ด'); return; }
+  // ให้ Chart.js วาดเสร็จก่อน
+  setTimeout(function(){
+    html2canvas(target,{scale:3,useCORS:true,backgroundColor:'#ffffff',width:1123,height:794,windowWidth:1123,windowHeight:794}).then(callback).catch(err=>alert('สร้างภาพแดชบอร์ดไม่สำเร็จ: '+err));
+  },300);
+}
+function downloadDashboardImage(){
+  captureDashboard(function(canvas){
+    const link=document.createElement('a');
+    const d=new Date(); const y=d.getFullYear()+543; const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0');
+    link.download=`dashboard_report_${day}-${m}-${y}.jpg`;
+    link.href=canvas.toDataURL('image/jpeg',1.0);
+    link.click();
+  });
+}
+function printDashboardImage(){
+  captureDashboard(function(canvas){
+    const imgData=canvas.toDataURL('image/jpeg',1.0);
+    const w=window.open('','_blank');
+    w.document.open();
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>พิมพ์แดชบอร์ด</title><style>html,body{margin:0;padding:0;background:#fff}.page{width:297mm;height:210mm;display:flex;align-items:center;justify-content:center;box-sizing:border-box;padding:0}img{width:297mm;height:210mm;object-fit:contain;display:block}@page{size:A4 landscape;margin:0}@media print{html,body{width:297mm;height:210mm}}</style></head><body><div class="page"><img src="${imgData}"></div><script>window.onload=function(){setTimeout(function(){window.print()},300)};<\/script></body></html>`);
+    w.document.close();
+  });
+}
+</script>
+{% endblock %}

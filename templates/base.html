@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ระบบเฝ้าระวังทันตสุขภาพ</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{--primary:#1565c0;--soft:#eef6ff;--danger:#d93025;--green:#0f8f55;--muted:#667085}
+    .topbrand::before{content:'ระบบเฝ้าระวังทันตสุขภาพ'}
+    .brand::before{content:'Dental Health'}
+    .logo-mark{background:linear-gradient(135deg,#1565c0,#31a9ff)!important}
+    .main{padding-bottom:40px}.card,.panel,.box{background:#fff;border-radius:22px;padding:20px;margin-bottom:18px;box-shadow:0 10px 35px rgba(15,95,183,.08);border:1px solid #e9eef6}h1,h2,h3{color:#1d2939}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}.grid.compact{grid-template-columns:repeat(auto-fit,minmax(145px,1fr));align-items:end}.stat{background:var(--soft);border-radius:18px;padding:18px;border:1px solid #d8eaff}.stat b{font-size:32px;color:var(--primary)}.btn,button.btn,a.btn{border:0;border-radius:12px;padding:10px 14px;background:var(--primary);color:white;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;font-weight:700}.btn.red{background:var(--danger)}.btn.gray{background:var(--muted)}.btn.green{background:var(--green)}input,select,textarea{width:100%;padding:10px 12px;border:1px solid #cfd7e3;border-radius:12px;box-sizing:border-box;background:#fff}textarea{min-height:76px}label{font-weight:800;font-size:14px;color:#1d2939}.check-row{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:14px;margin:8px 0 14px}.check-card{display:flex;align-items:center;justify-content:center;gap:10px;border:1px solid #d7dfeb;border-radius:16px;background:#f8fbff;padding:13px 16px;min-height:48px}.check-card input{width:20px;height:20px;flex:0 0 auto}.check-card span{font-size:17px;font-weight:900}table{width:100%;border-collapse:separate;border-spacing:0;background:white;overflow:hidden;border-radius:14px}th,td{border-bottom:1px solid #e5e7eb;padding:10px;text-align:left;vertical-align:middle}th{background:#eff6ff;color:#1d2939}.actions{display:flex;gap:7px;flex-wrap:wrap}.flash,.alert{padding:12px 14px;border-radius:13px;margin:10px 0}.danger{background:#ffe8e6;color:#a30000}.success{background:#e7fff2;color:#075c34}.report-table{border-collapse:collapse;border-radius:0}.report-table th,.report-table td{border:1px solid #222;text-align:center;padding:6px;background:white}.report-table th{font-weight:800}.report-head{font-size:14px;line-height:1.9}.sign-area{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:22px}.small{font-size:13px;color:#475467}.no-print{print-color-adjust:exact}.table-wrap{overflow:auto}.form-section{border:1px solid #e6edf7;border-radius:18px;padding:16px;margin-bottom:16px;background:#fbfdff}.form-section h3{margin-top:0}.hero-title{font-size:26px;font-weight:900;margin:0 0 12px}.toolbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.toolbar>*{min-width:180px}.public-link{min-width:280px}
+    @media(max-width:800px){.check-row{grid-template-columns:1fr}.grid,.grid.compact{grid-template-columns:1fr}.toolbar>*{min-width:100%}.main{padding:16px}.card{padding:16px}}
+    @media print{.topbar,.sidebar,.nav-backdrop,.no-print,.btn,button{display:none!important}body{background:white}.main{margin:0!important;padding:0!important}.card{box-shadow:none;border:0;border-radius:0}.report-table th,.report-table td{font-size:12px;padding:4px}.report-head{font-size:13px}.print-landscape{page-break-inside:avoid}@page{size:A4 landscape;margin:10mm}}
+  </style>
+</head>
+<body>
+<input type="checkbox" id="nav-toggle" class="nav-toggle">
+<header class="topbar">
+  <label for="nav-toggle" class="hamburger">☰</label>
+  <div class="topbrand"></div>
+  <div class="topuser">{% if session.user_id %}{{session.username}} ({{session.role}}){% else %}Viewer{% endif %}</div>
+</header>
+<aside class="sidebar">
+  <div class="brand-card">
+    <div class="logo-mark">ฟัน</div>
+    <div class="brand"></div>
+    <div class="brand-sub">School Dental & Growth Dashboard</div>
+  </div>
+  <nav>
+    <a href="{{url_for('dashboard')}}">🏠 แดชบอร์ด</a>
+    <a href="{{url_for('dental_report')}}">🦷 รายงานฟันผุ</a>
+    {% if session.user_id %}
+      <a href="{{url_for('rounds')}}">🗓️ รอบการกรอก</a>
+      <a href="{{url_for('students')}}">👨‍🎓 ข้อมูลนักเรียน</a>
+      <a href="{{url_for('export_excel')}}">⬇️ ดาวน์โหลด Excel</a>
+      {% if session.role=='admin' %}<a href="{{url_for('users')}}">👥 จัดการ User</a>{% endif %}
+      <a href="{{url_for('logout')}}">🚪 ออกจากระบบ</a>
+    {% else %}
+      <a href="{{url_for('login')}}">🔐 เข้าสู่ระบบ</a>
+    {% endif %}
+  </nav>
+</aside>
+<label for="nav-toggle" class="nav-backdrop" aria-label="ปิดเมนู"></label>
+<main class="main">
+  {% with messages=get_flashed_messages(with_categories=true) %}
+    {% for cat,msg in messages %}<div class="alert {{cat}}">{{msg}}</div>{% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

@@ -1,0 +1,113 @@
+{% extends 'base.html' %}{% block content %}
+<div class="card no-print">
+  <h2>รายงานผลภาวะช่องปากของนักเรียน</h2>
+  <form class="toolbar"><div><label>เลือกรอบ</label><select name="round_id" onchange="this.form.submit()">{% for r in rounds %}<option value="{{r.id}}" {% if r.id==round_id %}selected{% endif %}>{{r.title}}</option>{% endfor %}</select></div></form>
+  <br>
+  <button class="btn gray" onclick="print()">พิมพ์รายงาน</button>
+  <button class="btn green" type="button" onclick="downloadReportImage()">บันทึกภาพรายงาน JPG</button>
+</div>
+<div id="report-paper" class="card print-landscape official-report">
+  <div class="report-head official-head">
+    <div class="text-center"><b>งานเฝ้าระวังทันตสุขภาพในโรงเรียนมัธยมศึกษา ทส 002</b></div>
+    <div class="text-center"><b>แบบรายงานผลภาวะช่องปากของนักเรียนในงานเฝ้าระวังทันตสุขภาพระดับโรงเรียน</b></div>
+    <div class="line-row">
+      <span>โรงเรียน <u>{{round.school or '................................................'}}</u></span>
+      <span>หมู่ <u>{{round.village_no or '...........'}}</u></span>
+      <span>ตำบล <u>{{round.subdistrict or '............................'}}</u></span>
+    </div>
+    <div class="line-row">
+      <span>ที่อยู่ <u>{{round.school_address or '........................................................................................'}}</u></span>
+      <span>โทร <u>{{round.phone or '........................'}}</u></span>
+    </div>
+    <div class="line-row">
+      <span>อำเภอ <u>{{round.district or '........................'}}</u></span>
+      <span>จังหวัด <u>{{round.province or '........................'}}</u></span>
+      <span>รหัสไปรษณีย์ <u>{{round.zipcode or '................'}}</u></span>
+      <span>จำนวนเด็กนักเรียน <u>{{total}}</u> คน</span>
+    </div>
+    <div class="line-row">
+      <span>ครั้งที่สำรวจ <u>{{round.title if round else '................'}}</u></span>
+      <span>วันเดือนปี <u>{{thai_date(round.survey_date) if round else '................'}}</u> ที่สำรวจ</span>
+    </div>
+  </div>
+
+  <table class="report-table official-table" style="margin-top:8px">
+    <tr>
+      <th rowspan="2" style="width:135px">ชื่อปัญหา</th>
+      <th rowspan="2" style="width:85px">สภาพปัญหา</th>
+      <th colspan="6">ชั้นเรียน / คน</th>
+      <th colspan="2">รวม</th>
+    </tr>
+    <tr>
+      {% for g in grades %}<th>{{g}}</th>{% endfor %}<th>คน</th><th>ร้อยละ</th>
+    </tr>
+    {% for row in report_rows %}
+      <tr>
+        {% if row.first %}<td rowspan="{{row.rowspan}}" style="text-align:left"><b>{{row.problem}}</b></td>{% endif %}
+        <td style="text-align:left">{{row.status}}</td>
+        {% for g in grades %}<td>{{row.counts[g]}}</td>{% endfor %}
+        <td>{{row.total}}</td><td>{{'%.1f'%row.percent}}</td>
+      </tr>
+    {% endfor %}
+  </table>
+
+  <div class="report-bottom">
+    <div>
+      <div class="problem-line">เร่งด่วน <u>{{'%.1f'%urgent_pct}}</u> % &nbsp;&nbsp; เป็นปัญหา ({{'✓' if urgent_pct>10 else ' '}}) &nbsp; ไม่เป็นปัญหา ({{'✓' if urgent_pct<=10 else ' '}})</div>
+      <div class="problem-line">เหงือกอักเสบ <u>{{'%.1f'%gum_pct}}</u> % &nbsp;&nbsp; เป็นปัญหา ({{'✓' if gum_pct>50 else ' '}}) &nbsp; ไม่เป็นปัญหา ({{'✓' if gum_pct<=50 else ' '}})</div>
+      <div class="problem-line">ฟันผุ <u>{{'%.1f'%decay_pct}}</u> % &nbsp;&nbsp; เป็นปัญหา ({{'✓' if decay_pct>20 else ' '}}) &nbsp; ไม่เป็นปัญหา ({{'✓' if decay_pct<=20 else ' '}})</div>
+      <br>
+      <table class="report-table criteria-table">
+        <tr><th colspan="3">การจัดระดับปัญหา (นักเรียนทั้งชั้นเรียน นักเรียนทุกโรงเรียน)</th></tr>
+        <tr><th>ปัญหา</th><th>ไม่มีปัญหา</th><th>มีปัญหา (%)</th></tr>
+        <tr><td style="text-align:left">โรคฟันผุ (ในฟันถาวร)</td><td>0 - 20 %</td><td>มากกว่า 20</td></tr>
+        <tr><td style="text-align:left">เหงือกอักเสบ</td><td>0 - 50 %</td><td>มากกว่า 50</td></tr>
+        <tr><td style="text-align:left">อนามัยช่องปากที่ต้องการรักษาเร่งด่วน</td><td>0 - 10 %</td><td>มากกว่า 10</td></tr>
+      </table>
+    </div>
+    <div class="sign-area2">
+      <div style="text-align:center;line-height:2.1">
+        ลงชื่อ................................................ผู้รายงาน<br>
+        ตำแหน่ง................................................<br>
+        วันเดือนปี................................................ที่รายงาน<br><br>
+        ส่ง สส. และ สสอ. ปีละ 2 ครั้ง
+      </div>
+    </div>
+  </div>
+  <p class="small"><b>หมายเหตุ</b> เร่งด่วน หมายถึง เหงือกอักเสบรุนแรง หรือ มีหนองบวมขึ้นคลุมซี่ฟัน หรือ มีเศษรากฟันเหลืออยู่</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script>
+function downloadReportImage(){
+  const target = document.getElementById('report-paper');
+  if(!target){ alert('ไม่พบส่วนเอกสารรายงาน'); return; }
+  const oldShadow = target.style.boxShadow;
+  const oldRadius = target.style.borderRadius;
+  target.style.boxShadow = 'none';
+  target.style.borderRadius = '0';
+  html2canvas(target, {
+    scale: 3,
+    useCORS: true,
+    backgroundColor: '#ffffff',
+    windowWidth: target.scrollWidth,
+    windowHeight: target.scrollHeight
+  }).then(canvas => {
+    target.style.boxShadow = oldShadow;
+    target.style.borderRadius = oldRadius;
+    const link = document.createElement('a');
+    const d = new Date();
+    const y = d.getFullYear()+543;
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    link.download = `รายงานฟันผุ_${day}-${m}-${y}.jpg`;
+    link.href = canvas.toDataURL('image/jpeg', 1.0);
+    link.click();
+  }).catch(err => {
+    target.style.boxShadow = oldShadow;
+    target.style.borderRadius = oldRadius;
+    alert('บันทึกภาพไม่สำเร็จ: '+err);
+  });
+}
+</script>
+{% endblock %}
