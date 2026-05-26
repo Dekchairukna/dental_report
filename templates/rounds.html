@@ -4,6 +4,7 @@
   <form method="post" class="grid compact">
     <div><label>ชื่อรอบ</label><input name="title" required placeholder="เช่น รอบตรวจสุขภาพครั้งที่ 1/{{buddhist_year()}}"></div>
     <div><label>โรงเรียน</label><input name="school"></div>
+    <div><label>ที่อยู่โรงเรียน</label><input name="school_address" placeholder="บ้านเลขที่/ถนน/หมู่บ้าน"></div>
     <div><label>หมู่</label><input name="village_no"></div>
     <div><label>ตำบล</label><input name="subdistrict"></div>
     <div><label>อำเภอ</label><input name="district"></div>
@@ -16,11 +17,11 @@
 </div>
 <div class="card table-wrap">
   <table>
-    <tr><th>รอบ</th><th>โรงเรียน</th><th>ที่ตั้ง</th><th>วันที่</th><th>สถานะ</th><th>ลิงก์นักเรียน</th><th>จัดการ</th></tr>
+    <tr><th>รอบ</th><th>โรงเรียน/ที่อยู่</th><th>วันที่</th><th>สถานะ</th><th>ลิงก์นักเรียน</th><th>จัดการ</th></tr>
     {% for r in rounds %}
     <tr>
       <td><b>{{r.title}}</b><br><span class="small">แก้ไขล่าสุด {{r.updated_at or '-'}}</span></td>
-      <td><b>{{r.school}}</b></td><td><span class="small">หมู่ {{r.village_no or '-'}} ต.{{r.subdistrict or '-'}} อ.{{r.district or '-'}} จ.{{r.province or '-'}}</span></td>
+      <td><b>{{r.school}}</b><br><span class="small">{{r.school_address or ''}} หมู่ {{r.village_no or '-'}} ต.{{r.subdistrict or '-'}} อ.{{r.district or '-'}} จ.{{r.province or '-'}}</span></td>
       <td>{{thai_date(r.survey_date)}}</td><td>{{'เปิด' if r.is_open else 'ปิด'}}</td>
       <td><input class="public-link" readonly value="{{request.host_url[:-1]}}{{url_for('public_form',token=r.public_token)}}"></td>
       <td class="actions">

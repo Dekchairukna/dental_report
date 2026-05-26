@@ -4,6 +4,7 @@
   <form method="post" class="grid">
     <div><label>ชื่อรอบ</label><input name="title" value="{{r.title}}" required></div>
     <div><label>โรงเรียน</label><input name="school" value="{{r.school or ''}}"></div>
+    <div style="grid-column:1/-1"><label>ที่อยู่โรงเรียน</label><input name="school_address" value="{{r.school_address or ''}}" placeholder="บ้านเลขที่/ถนน/หมู่บ้าน"></div>
     <div><label>หมู่</label><input name="village_no" value="{{r.village_no or ''}}"></div>
     <div><label>ตำบล</label><input name="subdistrict" value="{{r.subdistrict or ''}}"></div>
     <div><label>อำเภอ</label><input name="district" value="{{r.district or ''}}"></div>
