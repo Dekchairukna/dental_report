@@ -64,8 +64,8 @@ class PgConnection:
         if psycopg2 is None:
             raise RuntimeError('DATABASE_URL is set but psycopg2-binary is not installed')
         url=os.environ.get('DATABASE_URL')
-        if url and url.startswith('postgresql://postgres:GnaNoklezfXJgeeGmBTVkgvhWcnjLaLC@postgres.railway.internal:5432/railway'):
-            url='postgresql://' + url[len('postgresql://postgres:GnaNoklezfXJgeeGmBTVkgvhWcnjLaLC@postgres.railway.internal:5432/railway'):]
+        if url and url.startswith('postgres://'):
+            url='postgresql://' + url[len('postgres://'):]
         self.con=psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
     def execute(self, sql, params=()):
         sql = sql.replace('?', '%s')
