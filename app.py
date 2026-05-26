@@ -1,4 +1,9 @@
 import os, sqlite3, secrets
+try:
+    import psycopg2
+    import psycopg2.extras
+except Exception:
+    psycopg2 = None
 from datetime import datetime
 from functools import wraps
 from io import BytesIO
@@ -51,25 +56,120 @@ def next_round_title(con):
     year = buddhist_year()
     n = con.execute('SELECT COUNT(*) AS c FROM rounds WHERE title LIKE ?', (f'%/{year}',)).fetchone()['c'] + 1
     return f'รอบตรวจสุขภาพครั้งที่ {n}/{year}'
+def is_postgres():
+    return bool(os.environ.get('DATABASE_URL'))
+
+class PgConnection:
+    def __init__(self):
+        if psycopg2 is None:
+            raise RuntimeError('DATABASE_URL is set but psycopg2-binary is not installed')
+        url=os.environ.get('DATABASE_URL')
+        if url and url.startswith('postgres://'):
+            url='postgresql://' + url[len('postgres://'):]
+        self.con=psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
+    def execute(self, sql, params=()):
+        sql = sql.replace('?', '%s')
+        cur=self.con.cursor()
+        cur.execute(sql, params)
+        return cur
+    def commit(self):
+        self.con.commit()
+    def close(self):
+        self.con.close()
+
 def db():
-    con=sqlite3.connect(DB_PATH); con.row_factory=sqlite3.Row; return con
+    if is_postgres():
+        return PgConnection()
+    con=sqlite3.connect(DB_PATH)
+    con.row_factory=sqlite3.Row
+    return con
 
 def init_db():
-    con=db(); cur=con.cursor()
-    cur.executescript('''
+    con=db()
+    if is_postgres():
+        con.execute("""
+        CREATE TABLE IF NOT EXISTS users(
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE,
+            password_hash TEXT,
+            role TEXT CHECK(role IN ('admin','user')) NOT NULL,
+            created_at TEXT
+        )""")
+        con.execute("""
+        CREATE TABLE IF NOT EXISTS rounds(
+            id SERIAL PRIMARY KEY,
+            title TEXT NOT NULL,
+            school TEXT,
+            school_address TEXT,
+            village_no TEXT,
+            subdistrict TEXT,
+            district TEXT,
+            province TEXT,
+            zipcode TEXT,
+            phone TEXT,
+            survey_date TEXT,
+            is_open INTEGER DEFAULT 1,
+            public_token TEXT UNIQUE,
+            created_at TEXT,
+            updated_at TEXT
+        )""")
+        con.execute("""
+        CREATE TABLE IF NOT EXISTS students(
+            id SERIAL PRIMARY KEY,
+            round_id INTEGER REFERENCES rounds(id),
+            id_card TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            birthdate TEXT,
+            gender TEXT,
+            grade TEXT,
+            room TEXT,
+            address TEXT,
+            weight REAL,
+            height REAL,
+            waist REAL,
+            hip REAL,
+            growth_weight_age TEXT,
+            growth_height_age TEXT,
+            growth_weight_height TEXT,
+            nutrition TEXT,
+            tooth_decay INTEGER DEFAULT 0,
+            gum_disease INTEGER DEFAULT 0,
+            urgent INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT,
+            created_by TEXT,
+            updated_by TEXT
+        )""")
+        con.execute("""
+        CREATE TABLE IF NOT EXISTS audit_logs(
+            id SERIAL PRIMARY KEY,
+            actor TEXT,
+            action TEXT,
+            detail TEXT,
+            created_at TEXT
+        )""")
+        if not con.execute('SELECT id FROM users WHERE username=%s',('admin',)).fetchone():
+            con.execute('INSERT INTO users(username,password_hash,role,created_at) VALUES(%s,%s,%s,%s)',('admin',generate_password_hash('admin123'),'admin',now()))
+        if not con.execute('SELECT id FROM users WHERE username=%s',('user',)).fetchone():
+            con.execute('INSERT INTO users(username,password_hash,role,created_at) VALUES(%s,%s,%s,%s)',('user',generate_password_hash('user123'),'user',now()))
+        if not con.execute('SELECT id FROM rounds LIMIT 1').fetchone():
+            con.execute('INSERT INTO rounds(title,school,school_address,village_no,subdistrict,district,province,zipcode,phone,survey_date,is_open,public_token,created_at,updated_at) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(f'รอบตรวจสุขภาพครั้งที่ 1/{buddhist_year()}','','','','','','ขอนแก่น','','',datetime.now().strftime('%Y-%m-%d'),1,secrets.token_urlsafe(10),now(),now()))
+        con.commit(); con.close(); return
+
+    cur=con.cursor()
+    cur.executescript("""
     CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT, role TEXT CHECK(role IN ('admin','user')) NOT NULL, created_at TEXT);
     CREATE TABLE IF NOT EXISTS rounds(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, school TEXT, school_address TEXT, village_no TEXT, subdistrict TEXT, district TEXT, province TEXT, zipcode TEXT, phone TEXT, survey_date TEXT, is_open INTEGER DEFAULT 1, public_token TEXT UNIQUE, created_at TEXT, updated_at TEXT);
     CREATE TABLE IF NOT EXISTS students(id INTEGER PRIMARY KEY AUTOINCREMENT, round_id INTEGER, id_card TEXT NOT NULL UNIQUE, name TEXT NOT NULL, birthdate TEXT, gender TEXT, grade TEXT, room TEXT, address TEXT, weight REAL, height REAL, waist REAL, hip REAL, growth_weight_age TEXT, growth_height_age TEXT, growth_weight_height TEXT, nutrition TEXT, tooth_decay INTEGER DEFAULT 0, gum_disease INTEGER DEFAULT 0, urgent INTEGER DEFAULT 0, note TEXT, created_at TEXT, updated_at TEXT, created_by TEXT, updated_by TEXT, FOREIGN KEY(round_id) REFERENCES rounds(id));
     CREATE TABLE IF NOT EXISTS audit_logs(id INTEGER PRIMARY KEY AUTOINCREMENT, actor TEXT, action TEXT, detail TEXT, created_at TEXT);
-    ''')
+    """)
     if not cur.execute('SELECT id FROM users WHERE username=?',('admin',)).fetchone():
         cur.execute('INSERT INTO users(username,password_hash,role,created_at) VALUES(?,?,?,?)',('admin',generate_password_hash('admin123'),'admin',now()))
     if not cur.execute('SELECT id FROM users WHERE username=?',('user',)).fetchone():
         cur.execute('INSERT INTO users(username,password_hash,role,created_at) VALUES(?,?,?,?)',('user',generate_password_hash('user123'),'user',now()))
     if not cur.execute('SELECT id FROM rounds').fetchone():
         cur.execute('INSERT INTO rounds(title,school,school_address,village_no,subdistrict,district,province,zipcode,phone,survey_date,is_open,public_token,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(f'รอบตรวจสุขภาพครั้งที่ 1/{buddhist_year()}','','','','','','ขอนแก่น','','',datetime.now().strftime('%Y-%m-%d'),1,secrets.token_urlsafe(10),now(),now()))
-    
-    # migration for older dental.db
     rcols=[r[1] for r in cur.execute('PRAGMA table_info(rounds)').fetchall()]
     for name,typ in [('school_address','TEXT'),('village_no','TEXT'),('subdistrict','TEXT'),('district','TEXT'),('province','TEXT'),('zipcode','TEXT'),('phone','TEXT')]:
         if name not in rcols:
@@ -111,6 +211,11 @@ def stats(round_id=None):
         label=r['growth_weight_height'] or r['nutrition']
         if label in nut: nut[label]+=1
     return {'total':total,'decay':sum(r['tooth_decay'] for r in rows),'gum':sum(r['gum_disease'] for r in rows),'urgent':sum(r['urgent'] for r in rows),'by_grade':by_grade,'nutrition':nut}
+
+@app.route('/init-db')
+def init_db_route():
+    init_db()
+    return 'Database initialized successfully'
 
 @app.route('/')
 def home(): return redirect(url_for('dashboard'))
@@ -397,5 +502,8 @@ def del_user(uid):
     if uid==session.get('user_id'): flash('ลบตัวเองไม่ได้','danger'); return redirect(url_for('users'))
     con=db(); con.execute('DELETE FROM users WHERE id=?',(uid,)); con.commit(); con.close(); return redirect(url_for('users'))
 
+# Railway/gunicorn imports app.py directly, so initialize tables at import time.
+init_db()
+
 if __name__=='__main__':
-    init_db(); app.run(host='0.0.0.0',port=int(os.environ.get('PORT',5001)),debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT',5001)), debug=True)
