@@ -1,4 +1,74 @@
 {% extends 'base.html' %}{% block content %}
+
+<style>
+/* ===== FIX: พิมพ์รายงานให้เหมือนหน้าบันทึก JPG และจบใน A4 แนวนอน ===== */
+@page{ size:A4 landscape; margin:8mm; }
+@media print{
+  html,body{ margin:0!important; padding:0!important; background:#fff!important; width:auto!important; height:auto!important; overflow:visible!important; }
+  .sidebar,.topbar,.no-print,nav,header,footer,.page-head,.btn,form{ display:none!important; }
+  .main{ margin:0!important; padding:0!important; max-width:none!important; width:100%!important; background:#fff!important; overflow:visible!important; }
+  .card{ box-shadow:none!important; }
+  #report-paper{
+    display:block!important;
+    width:277mm!important;
+    max-width:277mm!important;
+    min-height:auto!important;
+    margin:0 auto!important;
+    padding:7mm!important;
+    background:#fff!important;
+    color:#000!important;
+    border-radius:18px!important;
+    border:1px solid #dbeafe!important;
+    box-shadow:none!important;
+    page-break-before:auto!important;
+    page-break-after:auto!important;
+    page-break-inside:avoid!important;
+    overflow:visible!important;
+    font-size:12px!important;
+    line-height:1.32!important;
+  }
+  #report-paper *{ overflow:visible!important; box-sizing:border-box!important; }
+  #report-paper .official-head{ margin-bottom:5px!important; }
+  #report-paper .text-center{ text-align:center!important; }
+  #report-paper .line-row{ display:flex!important; flex-wrap:wrap!important; gap:8px 16px!important; margin-top:3px!important; }
+  #report-paper table,
+  #report-paper .report-table{
+    display:table!important;
+    width:100%!important;
+    border-collapse:collapse!important;
+    border-spacing:0!important;
+    table-layout:fixed!important;
+    margin-top:6px!important;
+    background:#fff!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+    page-break-inside:avoid!important;
+  }
+  #report-paper thead{ display:table-header-group!important; }
+  #report-paper tbody{ display:table-row-group!important; }
+  #report-paper tr{ display:table-row!important; page-break-inside:avoid!important; page-break-after:auto!important; }
+  #report-paper th,
+  #report-paper td{
+    display:table-cell!important;
+    border:1px solid #000!important;
+    padding:3px 4px!important;
+    font-size:11.5px!important;
+    line-height:1.25!important;
+    text-align:center!important;
+    vertical-align:middle!important;
+    background:#fff!important;
+    color:#000!important;
+  }
+  #report-paper th{ background:#dff1fb!important; font-weight:800!important; }
+  #report-paper td[style*="text-align:left"]{ text-align:left!important; }
+  #report-paper .report-bottom{ display:flex!important; justify-content:space-between!important; gap:14px!important; margin-top:8px!important; page-break-inside:avoid!important; }
+  #report-paper .problem-line{ font-size:12px!important; margin:2px 0!important; }
+  #report-paper .criteria-table{ width:150mm!important; margin-top:5px!important; }
+  #report-paper .sign-area2{ width:82mm!important; padding-top:14mm!important; font-size:12px!important; }
+  #report-paper .small{ font-size:11px!important; margin-top:5px!important; }
+}
+</style>
+
 <div class="card no-print">
   <h2>รายงานผลภาวะช่องปากของนักเรียน</h2>
   <form class="toolbar"><div><label>เลือกรอบ</label><select name="round_id" onchange="this.form.submit()">{% for r in rounds %}<option value="{{r.id}}" {% if r.id==round_id %}selected{% endif %}>{{r.title}}</option>{% endfor %}</select></div></form>
