@@ -397,5 +397,7 @@ def del_user(uid):
     if uid==session.get('user_id'): flash('ลบตัวเองไม่ได้','danger'); return redirect(url_for('users'))
     con=db(); con.execute('DELETE FROM users WHERE id=?',(uid,)); con.commit(); con.close(); return redirect(url_for('users'))
 
+init_db()
+
 if __name__=='__main__':
-    init_db(); app.run(host='0.0.0.0',port=int(os.environ.get('PORT',5000)),debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT',5000)), debug=True)
