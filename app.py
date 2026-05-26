@@ -9,8 +9,18 @@ from openpyxl.chart import BarChart, PieChart, Reference
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils import get_column_letter
 
+try:
+    import psycopg2
+    import psycopg2.extras
+except Exception:
+    psycopg2 = None
+
+
 BASE_DIR=os.path.abspath(os.path.dirname(__file__))
 DB_PATH=os.path.join(BASE_DIR,'dental.db')
+DATABASE_URL=os.environ.get('DATABASE_URL','').strip()
+USE_POSTGRES=bool(DATABASE_URL and DATABASE_URL.startswith(('postgres://','postgresql://')))
+
 app=Flask(__name__)
 app.secret_key=os.environ.get('SECRET_KEY','dev-secret-change-me')
 
@@ -47,38 +57,137 @@ def utility_processor():
     return dict(thai_date=thai_date, buddhist_year=buddhist_year)
 
 
-def next_round_title(con):
-    year = buddhist_year()
-    n = con.execute('SELECT COUNT(*) AS c FROM rounds WHERE title LIKE ?', (f'%/{year}',)).fetchone()['c'] + 1
-    return f'รอบตรวจสุขภาพครั้งที่ {n}/{year}'
+def _convert_sql(sql):
+    if not USE_POSTGRES:
+        return sql
+    sql = sql.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY')
+    sql = sql.replace('1-is_open', 'CASE WHEN is_open=1 THEN 0 ELSE 1 END')
+    return sql.replace('?', '%s')
+
+class DB:
+    def __init__(self):
+        if USE_POSTGRES:
+            if psycopg2 is None:
+                raise RuntimeError('psycopg2-binary is not installed')
+            self.con = psycopg2.connect(DATABASE_URL)
+        else:
+            self.con = sqlite3.connect(DB_PATH)
+            self.con.row_factory = sqlite3.Row
+
+    def execute(self, sql, params=()):
+        if USE_POSTGRES:
+            cur = self.con.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cur.execute(_convert_sql(sql), params)
+            return cur
+        return self.con.execute(sql, params)
+
+    def executescript(self, script):
+        if USE_POSTGRES:
+            cur = self.con.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cur.execute(_convert_sql(script))
+            return cur
+        return self.con.executescript(script)
+
+    def cursor(self):
+        if USE_POSTGRES:
+            return self.con.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        return self.con.cursor()
+
+    def commit(self): self.con.commit()
+    def close(self): self.con.close()
+
 def db():
-    con=sqlite3.connect(DB_PATH); con.row_factory=sqlite3.Row; return con
+    return DB()
 
 def init_db():
     con=db(); cur=con.cursor()
-    cur.executescript('''
-    CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT, role TEXT CHECK(role IN ('admin','user')) NOT NULL, created_at TEXT);
-    CREATE TABLE IF NOT EXISTS rounds(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, school TEXT, school_address TEXT, village_no TEXT, subdistrict TEXT, district TEXT, province TEXT, zipcode TEXT, phone TEXT, survey_date TEXT, is_open INTEGER DEFAULT 1, public_token TEXT UNIQUE, created_at TEXT, updated_at TEXT);
-    CREATE TABLE IF NOT EXISTS students(id INTEGER PRIMARY KEY AUTOINCREMENT, round_id INTEGER, id_card TEXT NOT NULL UNIQUE, name TEXT NOT NULL, birthdate TEXT, gender TEXT, grade TEXT, room TEXT, address TEXT, weight REAL, height REAL, waist REAL, hip REAL, growth_weight_age TEXT, growth_height_age TEXT, growth_weight_height TEXT, nutrition TEXT, tooth_decay INTEGER DEFAULT 0, gum_disease INTEGER DEFAULT 0, urgent INTEGER DEFAULT 0, note TEXT, created_at TEXT, updated_at TEXT, created_by TEXT, updated_by TEXT, FOREIGN KEY(round_id) REFERENCES rounds(id));
-    CREATE TABLE IF NOT EXISTS audit_logs(id INTEGER PRIMARY KEY AUTOINCREMENT, actor TEXT, action TEXT, detail TEXT, created_at TEXT);
-    ''')
-    if not cur.execute('SELECT id FROM users WHERE username=?',('admin',)).fetchone():
-        cur.execute('INSERT INTO users(username,password_hash,role,created_at) VALUES(?,?,?,?)',('admin',generate_password_hash('admin123'),'admin',now()))
-    if not cur.execute('SELECT id FROM users WHERE username=?',('user',)).fetchone():
-        cur.execute('INSERT INTO users(username,password_hash,role,created_at) VALUES(?,?,?,?)',('user',generate_password_hash('user123'),'user',now()))
-    if not cur.execute('SELECT id FROM rounds').fetchone():
-        cur.execute('INSERT INTO rounds(title,school,school_address,village_no,subdistrict,district,province,zipcode,phone,survey_date,is_open,public_token,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(f'รอบตรวจสุขภาพครั้งที่ 1/{buddhist_year()}','','','','','','ขอนแก่น','','',datetime.now().strftime('%Y-%m-%d'),1,secrets.token_urlsafe(10),now(),now()))
-    
-    # migration for older dental.db
-    rcols=[r[1] for r in cur.execute('PRAGMA table_info(rounds)').fetchall()]
-    for name,typ in [('school_address','TEXT'),('village_no','TEXT'),('subdistrict','TEXT'),('district','TEXT'),('province','TEXT'),('zipcode','TEXT'),('phone','TEXT')]:
-        if name not in rcols:
-            cur.execute(f'ALTER TABLE rounds ADD COLUMN {name} {typ}')
-    cols=[r[1] for r in cur.execute('PRAGMA table_info(students)').fetchall()]
-    for name,typ in [('hip','REAL'),('growth_weight_age','TEXT'),('growth_height_age','TEXT'),('growth_weight_height','TEXT')]:
-        if name not in cols:
-            cur.execute(f'ALTER TABLE students ADD COLUMN {name} {typ}')
+    if USE_POSTGRES:
+        con.execute("""CREATE TABLE IF NOT EXISTS users(
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE,
+            password_hash TEXT,
+            role TEXT CHECK(role IN ('admin','user')) NOT NULL,
+            created_at TEXT
+        )""")
+        con.execute("""CREATE TABLE IF NOT EXISTS rounds(
+            id SERIAL PRIMARY KEY,
+            title TEXT NOT NULL,
+            school TEXT,
+            school_address TEXT,
+            village_no TEXT,
+            subdistrict TEXT,
+            district TEXT,
+            province TEXT,
+            zipcode TEXT,
+            phone TEXT,
+            survey_date TEXT,
+            is_open INTEGER DEFAULT 1,
+            public_token TEXT UNIQUE,
+            created_at TEXT,
+            updated_at TEXT
+        )""")
+        con.execute("""CREATE TABLE IF NOT EXISTS students(
+            id SERIAL PRIMARY KEY,
+            round_id INTEGER REFERENCES rounds(id),
+            id_card TEXT NOT NULL UNIQUE,
+            name TEXT NOT NULL,
+            birthdate TEXT,
+            gender TEXT,
+            grade TEXT,
+            room TEXT,
+            address TEXT,
+            weight REAL,
+            height REAL,
+            waist REAL,
+            hip REAL,
+            growth_weight_age TEXT,
+            growth_height_age TEXT,
+            growth_weight_height TEXT,
+            nutrition TEXT,
+            tooth_decay INTEGER DEFAULT 0,
+            gum_disease INTEGER DEFAULT 0,
+            urgent INTEGER DEFAULT 0,
+            note TEXT,
+            created_at TEXT,
+            updated_at TEXT,
+            created_by TEXT,
+            updated_by TEXT
+        )""")
+        con.execute("""CREATE TABLE IF NOT EXISTS audit_logs(
+            id SERIAL PRIMARY KEY,
+            actor TEXT,
+            action TEXT,
+            detail TEXT,
+            created_at TEXT
+        )""")
+    else:
+        con.executescript("""
+        CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password_hash TEXT, role TEXT CHECK(role IN ('admin','user')) NOT NULL, created_at TEXT);
+        CREATE TABLE IF NOT EXISTS rounds(id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, school TEXT, school_address TEXT, village_no TEXT, subdistrict TEXT, district TEXT, province TEXT, zipcode TEXT, phone TEXT, survey_date TEXT, is_open INTEGER DEFAULT 1, public_token TEXT UNIQUE, created_at TEXT, updated_at TEXT);
+        CREATE TABLE IF NOT EXISTS students(id INTEGER PRIMARY KEY AUTOINCREMENT, round_id INTEGER, id_card TEXT NOT NULL UNIQUE, name TEXT NOT NULL, birthdate TEXT, gender TEXT, grade TEXT, room TEXT, address TEXT, weight REAL, height REAL, waist REAL, hip REAL, growth_weight_age TEXT, growth_height_age TEXT, growth_weight_height TEXT, nutrition TEXT, tooth_decay INTEGER DEFAULT 0, gum_disease INTEGER DEFAULT 0, urgent INTEGER DEFAULT 0, note TEXT, created_at TEXT, updated_at TEXT, created_by TEXT, updated_by TEXT, FOREIGN KEY(round_id) REFERENCES rounds(id));
+        CREATE TABLE IF NOT EXISTS audit_logs(id INTEGER PRIMARY KEY AUTOINCREMENT, actor TEXT, action TEXT, detail TEXT, created_at TEXT);
+        """)
+    if not con.execute('SELECT id FROM users WHERE username=?',('admin',)).fetchone():
+        con.execute('INSERT INTO users(username,password_hash,role,created_at) VALUES(?,?,?,?)',('admin',generate_password_hash('admin123'),'admin',now()))
+    if not con.execute('SELECT id FROM users WHERE username=?',('user',)).fetchone():
+        con.execute('INSERT INTO users(username,password_hash,role,created_at) VALUES(?,?,?,?)',('user',generate_password_hash('user123'),'user',now()))
+    if not con.execute('SELECT id FROM rounds LIMIT 1').fetchone():
+        con.execute('INSERT INTO rounds(title,school,school_address,village_no,subdistrict,district,province,zipcode,phone,survey_date,is_open,public_token,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(f'รอบตรวจสุขภาพครั้งที่ 1/{buddhist_year()}','','','','','','ขอนแก่น','','',datetime.now().strftime('%Y-%m-%d'),1,secrets.token_urlsafe(10),now(),now()))
+    if not USE_POSTGRES:
+        rcols=[r[1] for r in cur.execute('PRAGMA table_info(rounds)').fetchall()]
+        for name,typ in [('school_address','TEXT'),('village_no','TEXT'),('subdistrict','TEXT'),('district','TEXT'),('province','TEXT'),('zipcode','TEXT'),('phone','TEXT')]:
+            if name not in rcols:
+                cur.execute(f'ALTER TABLE rounds ADD COLUMN {name} {typ}')
+        cols=[r[1] for r in cur.execute('PRAGMA table_info(students)').fetchall()]
+        for name,typ in [('hip','REAL'),('growth_weight_age','TEXT'),('growth_height_age','TEXT'),('growth_weight_height','TEXT')]:
+            if name not in cols:
+                cur.execute(f'ALTER TABLE students ADD COLUMN {name} {typ}')
     con.commit(); con.close()
+
+@app.route('/init-db')
+def init_db_route():
+    init_db()
+    return 'Database initialized successfully'
 
 def log(action,detail=''):
     con=db(); con.execute('INSERT INTO audit_logs(actor,action,detail,created_at) VALUES(?,?,?,?)',(session.get('username','public'),action,detail,now())); con.commit(); con.close()
@@ -140,7 +249,7 @@ def rounds():
         survey_date = request.form.get('survey_date') or datetime.now().strftime('%Y-%m-%d')
         cur=con.execute('''INSERT INTO rounds(title,school,school_address,village_no,subdistrict,district,province,zipcode,phone,survey_date,is_open,public_token,created_at,updated_at)
                            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
-                        (title,request.form.get('school',''),request.form.get('school_address',''),request.form.get('village_no',''),request.form.get('subdistrict',''),request.form.get('district',''),request.form.get('province',''),request.form.get('zipcode',''),request.form.get('phone',''),survey_date,1,secrets.token_urlsafe(10),now(),now()))
+                        (title,request.form.get('school',''),'',request.form.get('village_no',''),request.form.get('subdistrict',''),request.form.get('district',''),request.form.get('province',''),request.form.get('zipcode',''),request.form.get('phone',''),survey_date,1,secrets.token_urlsafe(10),now(),now()))
         con.commit(); log('create_round',title); return redirect(url_for('rounds'))
     rows=con.execute('SELECT * FROM rounds ORDER BY id DESC').fetchall(); con.close(); return render_template('rounds.html',rounds=rows)
 
@@ -153,7 +262,7 @@ def edit_round(rid):
         con.close(); abort(404)
     if request.method=='POST':
         con.execute('''UPDATE rounds SET title=?, school=?, school_address=?, village_no=?, subdistrict=?, district=?, province=?, zipcode=?, phone=?, survey_date=?, is_open=?, updated_at=? WHERE id=?''',
-                    (request.form['title'], request.form.get('school',''), request.form.get('school_address',''), request.form.get('village_no',''), request.form.get('subdistrict',''), request.form.get('district',''), request.form.get('province',''), request.form.get('zipcode',''), request.form.get('phone',''), request.form.get('survey_date',''), 1 if request.form.get('is_open') else 0, now(), rid))
+                    (request.form['title'], request.form.get('school',''), '', request.form.get('village_no',''), request.form.get('subdistrict',''), request.form.get('district',''), request.form.get('province',''), request.form.get('zipcode',''), request.form.get('phone',''), request.form.get('survey_date',''), 1 if request.form.get('is_open') else 0, now(), rid))
         con.commit(); con.close(); log('edit_round',str(rid)); return redirect(url_for('rounds'))
     con.close(); return render_template('round_form.html',r=r)
 
@@ -397,13 +506,7 @@ def del_user(uid):
     if uid==session.get('user_id'): flash('ลบตัวเองไม่ได้','danger'); return redirect(url_for('users'))
     con=db(); con.execute('DELETE FROM users WHERE id=?',(uid,)); con.commit(); con.close(); return redirect(url_for('users'))
 
-# สร้าง/อัปเดตฐานข้อมูลอัตโนมัติเมื่อ Railway รันด้วย gunicorn
 init_db()
-
-@app.route('/init-db')
-def init_db_route():
-    init_db()
-    return 'Database initialized successfully'
 
 if __name__=='__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT',5000)), debug=True)
