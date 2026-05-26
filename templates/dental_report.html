@@ -3,7 +3,7 @@
   <h2>รายงานผลภาวะช่องปากของนักเรียน</h2>
   <form class="toolbar"><div><label>เลือกรอบ</label><select name="round_id" onchange="this.form.submit()">{% for r in rounds %}<option value="{{r.id}}" {% if r.id==round_id %}selected{% endif %}>{{r.title}}</option>{% endfor %}</select></div></form>
   <br>
-  <button class="btn gray" onclick="print()">พิมพ์รายงาน</button>
+  <button class="btn gray" type="button" onclick="window.print()">พิมพ์รายงาน</button>
   <button class="btn green" type="button" onclick="downloadReportImage()">บันทึกภาพรายงาน JPG</button>
 </div>
 <div id="report-paper" class="card print-landscape official-report">
