@@ -16,11 +16,11 @@
 </div>
 <div class="card table-wrap">
   <table>
-    <tr><th>รอบ</th><th>โรงเรียน</th><th>ที่ตั้ง</th><th>วันที่</th><th>สถานะ</th><th>ลิงก์นักเรียน</th><th>จัดการ</th></tr>
+    <tr><th>รอบ</th><th>โรงเรียน/หมู่/ตำบล</th><th>วันที่</th><th>สถานะ</th><th>ลิงก์นักเรียน</th><th>จัดการ</th></tr>
     {% for r in rounds %}
     <tr>
       <td><b>{{r.title}}</b><br><span class="small">แก้ไขล่าสุด {{r.updated_at or '-'}}</span></td>
-      <td><b>{{r.school}}</b></td><td><span class="small">หมู่ {{r.village_no or '-'}} ต.{{r.subdistrict or '-'}} อ.{{r.district or '-'}} จ.{{r.province or '-'}}</span></td>
+      <td><b>{{r.school}}</b><br><span class="small">หมู่ {{r.village_no or '-'}} ต.{{r.subdistrict or '-'}} อ.{{r.district or '-'}} จ.{{r.province or '-'}}</span></td>
       <td>{{thai_date(r.survey_date)}}</td><td>{{'เปิด' if r.is_open else 'ปิด'}}</td>
       <td><input class="public-link" readonly value="{{request.host_url[:-1]}}{{url_for('public_form',token=r.public_token)}}"></td>
       <td class="actions">
