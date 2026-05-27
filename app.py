@@ -5,6 +5,7 @@ try:
 except Exception:
     psycopg2 = None
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from functools import wraps
 from io import BytesIO
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file, abort
@@ -18,6 +19,7 @@ BASE_DIR=os.path.abspath(os.path.dirname(__file__))
 DB_PATH=os.path.join(BASE_DIR,'dental.db')
 app=Flask(__name__)
 app.secret_key=os.environ.get('SECRET_KEY','dev-secret-change-me')
+THAI_TZ = ZoneInfo('Asia/Bangkok')
 
 GRADES=[f'ม.{i}' for i in range(1,7)]
 GROWTH_WA=['น้ำหนักน้อยกว่าเกณฑ์','น้ำหนักตามเกณฑ์','น้ำหนักมากกว่าเกณฑ์']
@@ -119,7 +121,8 @@ def auto_update_growth_for_student(con, sid, actor='system'):
                 (wa, ha, wh, wh, now(), actor, sid))
     return True
 
-def now(): return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+def now():
+    return datetime.now(THAI_TZ).strftime('%Y-%m-%d %H:%M:%S')
 
 def to_cm(value, unit='cm'):
     """รับค่าจากฟอร์มแล้วคืนค่าเป็นเซนติเมตรเสมอ; รองรับ unit cm/inch"""
@@ -152,11 +155,42 @@ def thai_date(value):
     return f'{value.day} {THAI_MONTHS[value.month]} {value.year + 543}'
 
 def buddhist_year():
-    return datetime.now().year + 543
+    return datetime.now(THAI_TZ).year + 543
+
+
+def thai_years_for_birth():
+    # ช่วงปีเกิดสำหรับนักเรียน/ผู้กรอก ใช้ พ.ศ. ในฟอร์ม
+    current_be = buddhist_year()
+    return list(range(current_be - 80, current_be + 1))
+
+def split_birthdate(value):
+    """รับ yyyy-mm-dd แล้วคืน (วัน, เดือน, ปี พ.ศ.) สำหรับแสดงในฟอร์มไทย"""
+    if not value:
+        return ('', '', '')
+    try:
+        d = datetime.strptime(str(value)[:10], '%Y-%m-%d')
+        return (d.day, d.month, d.year + 543)
+    except Exception:
+        return ('', '', '')
+
+def thai_birthdate_from_form(form):
+    """รับวัน/เดือน/ปี พ.ศ. จากฟอร์ม แล้วแปลงเป็น yyyy-mm-dd เก็บลงฐานข้อมูล"""
+    day = (form.get('birth_day') or '').strip()
+    month = (form.get('birth_month') or '').strip()
+    year_be = (form.get('birth_year') or '').strip()
+    if day and month and year_be:
+        try:
+            y = int(year_be) - 543
+            m = int(month)
+            d = int(day)
+            return datetime(y, m, d).strftime('%Y-%m-%d')
+        except Exception:
+            return ''
+    return (form.get('birthdate') or '').strip()
 
 @app.context_processor
 def utility_processor():
-    return dict(thai_date=thai_date, buddhist_year=buddhist_year)
+    return dict(thai_date=thai_date, buddhist_year=buddhist_year, thai_months=THAI_MONTHS, thai_years_for_birth=thai_years_for_birth, split_birthdate=split_birthdate)
 
 
 def next_round_title(con):
@@ -261,7 +295,7 @@ def init_db():
         if not con.execute('SELECT id FROM users WHERE username=%s',('user',)).fetchone():
             con.execute('INSERT INTO users(username,password_hash,role,created_at) VALUES(%s,%s,%s,%s)',('user',generate_password_hash('user123'),'user',now()))
         if not con.execute('SELECT id FROM rounds LIMIT 1').fetchone():
-            con.execute('INSERT INTO rounds(title,school,school_address,village_no,subdistrict,district,province,zipcode,phone,survey_date,is_open,public_token,created_at,updated_at) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(f'รอบตรวจสุขภาพครั้งที่ 1/{buddhist_year()}','','','','','','ขอนแก่น','','',datetime.now().strftime('%Y-%m-%d'),1,secrets.token_urlsafe(10),now(),now()))
+            con.execute('INSERT INTO rounds(title,school,school_address,village_no,subdistrict,district,province,zipcode,phone,survey_date,is_open,public_token,created_at,updated_at) VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)',(f'รอบตรวจสุขภาพครั้งที่ 1/{buddhist_year()}','','','','','','ขอนแก่น','','',datetime.now(THAI_TZ).strftime('%Y-%m-%d'),1,secrets.token_urlsafe(10),now(),now()))
         con.commit(); con.close(); return
 
     cur=con.cursor()
@@ -276,7 +310,7 @@ def init_db():
     if not cur.execute('SELECT id FROM users WHERE username=?',('user',)).fetchone():
         cur.execute('INSERT INTO users(username,password_hash,role,created_at) VALUES(?,?,?,?)',('user',generate_password_hash('user123'),'user',now()))
     if not cur.execute('SELECT id FROM rounds').fetchone():
-        cur.execute('INSERT INTO rounds(title,school,school_address,village_no,subdistrict,district,province,zipcode,phone,survey_date,is_open,public_token,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(f'รอบตรวจสุขภาพครั้งที่ 1/{buddhist_year()}','','','','','','ขอนแก่น','','',datetime.now().strftime('%Y-%m-%d'),1,secrets.token_urlsafe(10),now(),now()))
+        cur.execute('INSERT INTO rounds(title,school,school_address,village_no,subdistrict,district,province,zipcode,phone,survey_date,is_open,public_token,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(f'รอบตรวจสุขภาพครั้งที่ 1/{buddhist_year()}','','','','','','ขอนแก่น','','',datetime.now(THAI_TZ).strftime('%Y-%m-%d'),1,secrets.token_urlsafe(10),now(),now()))
     rcols=[r[1] for r in cur.execute('PRAGMA table_info(rounds)').fetchall()]
     for name,typ in [('school_address','TEXT'),('village_no','TEXT'),('subdistrict','TEXT'),('district','TEXT'),('province','TEXT'),('zipcode','TEXT'),('phone','TEXT')]:
         if name not in rcols:
@@ -341,7 +375,7 @@ def logout(): session.clear(); return redirect(url_for('dashboard'))
 def dashboard():
     con=db(); rounds=con.execute('SELECT * FROM rounds ORDER BY id DESC').fetchall(); rid=request.args.get('round_id', type=int)
     if not rid and rounds: rid=rounds[0]['id']
-    s=stats(rid); con.close(); return render_template('dashboard.html',stats=s,rounds=rounds,round_id=rid,now_date=datetime.now().strftime('%Y-%m-%d'))
+    s=stats(rid); con.close(); return render_template('dashboard.html',stats=s,rounds=rounds,round_id=rid,now_date=datetime.now(THAI_TZ).strftime('%Y-%m-%d'))
 
 @app.route('/rounds',methods=['GET','POST'])
 @login_required
@@ -349,7 +383,7 @@ def rounds():
     con=db()
     if request.method=='POST':
         title = request.form.get('title') or next_round_title(con)
-        survey_date = request.form.get('survey_date') or datetime.now().strftime('%Y-%m-%d')
+        survey_date = request.form.get('survey_date') or datetime.now(THAI_TZ).strftime('%Y-%m-%d')
         cur=con.execute('''INSERT INTO rounds(title,school,school_address,village_no,subdistrict,district,province,zipcode,phone,survey_date,is_open,public_token,created_at,updated_at)
                            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                         (title,request.form.get('school',''),request.form.get('school_address',''),request.form.get('village_no',''),request.form.get('subdistrict',''),request.form.get('district',''),request.form.get('province',''),request.form.get('zipcode',''),request.form.get('phone',''),survey_date,1,secrets.token_urlsafe(10),now(),now()))
@@ -417,11 +451,12 @@ def save_student(sid):
     con=db(); rounds=con.execute('SELECT * FROM rounds ORDER BY id DESC').fetchall(); student=None
     if sid: student=con.execute('SELECT * FROM students WHERE id=?',(sid,)).fetchone()
     if request.method=='POST':
-        data={k:request.form.get(k,'').strip() for k in ['id_card','name','birthdate','gender','grade','room','address','growth_weight_age','growth_height_age','growth_weight_height','nutrition','note']}
+        data={k:request.form.get(k,'').strip() for k in ['id_card','name','gender','grade','room','address','growth_weight_age','growth_height_age','growth_weight_height','nutrition','note']}
+        data['birthdate'] = thai_birthdate_from_form(request.form)
         rid=int(request.form.get('round_id') or rounds[0]['id'])
         weight=request.form.get('weight') or None; height=request.form.get('height') or None
-        waist=to_cm(request.form.get('waist'), request.form.get('waist_unit','cm'))
-        hip=to_cm(request.form.get('hip'), request.form.get('hip_unit','cm'))
+        waist=to_cm(request.form.get('waist'), request.form.get('waist_unit','inch'))
+        hip=to_cm(request.form.get('hip'), request.form.get('hip_unit','inch'))
         decay=1 if request.form.get('tooth_decay') else 0; gum=1 if request.form.get('gum_disease') else 0; urgent=1 if request.form.get('urgent') else 0
         auto_wa, auto_ha, auto_wh = evaluate_growth(data['gender'], data['birthdate'], weight, height)
         if auto_wa:
@@ -450,10 +485,15 @@ def public_form(token):
     if not r or not r['is_open']: abort(404)
     if request.method=='POST':
         idc=request.form.get('id_card','').strip(); name=request.form.get('name','').strip()
+        birthdate = thai_birthdate_from_form(request.form)
+        gender = request.form.get('gender','')
+        weight = request.form.get('weight') or None
+        height = request.form.get('height') or None
+        auto_wa, auto_ha, auto_wh = evaluate_growth(gender, birthdate, weight, height)
         if con.execute('SELECT id FROM students WHERE id_card=?',(idc,)).fetchone():
             flash('เลขบัตรประชาชนนี้เคยกรอกแล้ว ติดต่อเจ้าหน้าที่หากต้องแก้ไข','danger')
         else:
-            con.execute('''INSERT INTO students(round_id,id_card,name,birthdate,gender,grade,room,address,weight,height,waist,hip,growth_weight_age,growth_height_age,growth_weight_height,nutrition,tooth_decay,gum_disease,urgent,note,created_at,updated_at,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(r['id'],idc,name,request.form.get('birthdate',''),request.form.get('gender',''),request.form.get('grade',''),request.form.get('room',''),request.form.get('address',''),request.form.get('weight') or None,request.form.get('height') or None,to_cm(request.form.get('waist'), request.form.get('waist_unit','cm')),to_cm(request.form.get('hip'), request.form.get('hip_unit','cm')),request.form.get('growth_weight_age',''),request.form.get('growth_height_age',''),request.form.get('growth_weight_height',''),request.form.get('growth_weight_height',''),0,0,0,'',now(),now(),'public','public'))
+            con.execute('''INSERT INTO students(round_id,id_card,name,birthdate,gender,grade,room,address,weight,height,waist,hip,growth_weight_age,growth_height_age,growth_weight_height,nutrition,tooth_decay,gum_disease,urgent,note,created_at,updated_at,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(r['id'],idc,name,birthdate,gender,request.form.get('grade',''),request.form.get('room',''),request.form.get('address',''),weight,height,to_cm(request.form.get('waist'), request.form.get('waist_unit','inch')),to_cm(request.form.get('hip'), request.form.get('hip_unit','inch')),auto_wa,auto_ha,auto_wh,auto_wh,0,0,0,'',now(),now(),'public','public'))
             con.commit(); log('public_submit',idc); con.close(); return render_template('public_done.html')
     con.close(); return render_template('student_form.html',student=None,rounds=[r],nutritions=NUTRITIONS,growth_wa=GROWTH_WA,growth_ha=GROWTH_HA,growth_wh=GROWTH_WH,public=True,round_fixed=r)
 
@@ -566,7 +606,7 @@ def export_excel():
     summary['A1']='สรุปแดชบอร์ดรายงานผลภาวะช่องปากและโภชนาการ'
     summary['A1'].fill=title_fill; summary['A1'].font=Font(color='FFFFFF', bold=True, size=16); summary['A1'].alignment=Alignment(horizontal='center')
     summary['A2']='รอบ'; summary['B2']=round_row['title'] if round_row else 'ทั้งหมด'
-    summary['A3']='วันที่ออกรายงาน'; summary['B3']=thai_date(datetime.now())
+    summary['A3']='วันที่ออกรายงาน'; summary['B3']=thai_date(datetime.now(THAI_TZ))
     summary['A4']='จำนวนนักเรียนทั้งหมด'; summary['B4']=total
     summary['D2']='ฟันผุ'; summary['E2']=sum(v['decay'] for v in by_grade.values())
     summary['D3']='เหงือกอักเสบ'; summary['E3']=sum(v['gum'] for v in by_grade.values())
