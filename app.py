@@ -121,6 +121,19 @@ def auto_update_growth_for_student(con, sid, actor='system'):
 
 def now(): return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+def to_cm(value, unit='cm'):
+    """รับค่าจากฟอร์มแล้วคืนค่าเป็นเซนติเมตรเสมอ; รองรับ unit cm/inch"""
+    if value in (None, ''):
+        return None
+    try:
+        num = float(value)
+    except (TypeError, ValueError):
+        return None
+    if (unit or 'cm') == 'inch':
+        num = num * 2.54
+    return round(num, 2)
+
+
 THAI_MONTHS = ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม']
 
 def thai_date(value):
@@ -406,7 +419,9 @@ def save_student(sid):
     if request.method=='POST':
         data={k:request.form.get(k,'').strip() for k in ['id_card','name','birthdate','gender','grade','room','address','growth_weight_age','growth_height_age','growth_weight_height','nutrition','note']}
         rid=int(request.form.get('round_id') or rounds[0]['id'])
-        weight=request.form.get('weight') or None; height=request.form.get('height') or None; waist=request.form.get('waist') or None; hip=request.form.get('hip') or None
+        weight=request.form.get('weight') or None; height=request.form.get('height') or None
+        waist=to_cm(request.form.get('waist'), request.form.get('waist_unit','cm'))
+        hip=to_cm(request.form.get('hip'), request.form.get('hip_unit','cm'))
         decay=1 if request.form.get('tooth_decay') else 0; gum=1 if request.form.get('gum_disease') else 0; urgent=1 if request.form.get('urgent') else 0
         auto_wa, auto_ha, auto_wh = evaluate_growth(data['gender'], data['birthdate'], weight, height)
         if auto_wa:
@@ -438,7 +453,7 @@ def public_form(token):
         if con.execute('SELECT id FROM students WHERE id_card=?',(idc,)).fetchone():
             flash('เลขบัตรประชาชนนี้เคยกรอกแล้ว ติดต่อเจ้าหน้าที่หากต้องแก้ไข','danger')
         else:
-            con.execute('''INSERT INTO students(round_id,id_card,name,birthdate,gender,grade,room,address,weight,height,waist,hip,growth_weight_age,growth_height_age,growth_weight_height,nutrition,tooth_decay,gum_disease,urgent,note,created_at,updated_at,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(r['id'],idc,name,request.form.get('birthdate',''),request.form.get('gender',''),request.form.get('grade',''),request.form.get('room',''),request.form.get('address',''),request.form.get('weight') or None,request.form.get('height') or None,request.form.get('waist') or None,request.form.get('hip') or None,request.form.get('growth_weight_age',''),request.form.get('growth_height_age',''),request.form.get('growth_weight_height',''),request.form.get('growth_weight_height',''),0,0,0,'',now(),now(),'public','public'))
+            con.execute('''INSERT INTO students(round_id,id_card,name,birthdate,gender,grade,room,address,weight,height,waist,hip,growth_weight_age,growth_height_age,growth_weight_height,nutrition,tooth_decay,gum_disease,urgent,note,created_at,updated_at,created_by,updated_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',(r['id'],idc,name,request.form.get('birthdate',''),request.form.get('gender',''),request.form.get('grade',''),request.form.get('room',''),request.form.get('address',''),request.form.get('weight') or None,request.form.get('height') or None,to_cm(request.form.get('waist'), request.form.get('waist_unit','cm')),to_cm(request.form.get('hip'), request.form.get('hip_unit','cm')),request.form.get('growth_weight_age',''),request.form.get('growth_height_age',''),request.form.get('growth_weight_height',''),request.form.get('growth_weight_height',''),0,0,0,'',now(),now(),'public','public'))
             con.commit(); log('public_submit',idc); con.close(); return render_template('public_done.html')
     con.close(); return render_template('student_form.html',student=None,rounds=[r],nutritions=NUTRITIONS,growth_wa=GROWTH_WA,growth_ha=GROWTH_HA,growth_wh=GROWTH_WH,public=True,round_fixed=r)
 
