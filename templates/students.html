@@ -40,6 +40,15 @@
       <a class="btn green" href="{{url_for('add_student')}}">เพิ่ม</a>
     </div>
   </form>
+
+  <form method="post" action="{{url_for('recalculate_growth')}}" onsubmit="return confirm('ให้ระบบประเมิน นน.อายุ / สส.อายุ / นน.สส. ใหม่ตามตัวกรองปัจจุบันทั้งหมด?')" style="margin-top:12px">
+    <input type="hidden" name="q" value="{{q}}">
+    <input type="hidden" name="round_id" value="{{round_id or ''}}">
+    <input type="hidden" name="grade" value="{{grade}}">
+    <input type="hidden" name="room" value="{{room}}">
+    <button class="btn green" type="submit">ประเมินโภชนาการอัตโนมัติตามตัวกรองนี้</button>
+    <span class="small">ใช้กับข้อมูลที่กรอกไปแล้วทั้งหมดได้ ไม่ต้องแก้ทีละคน</span>
+  </form>
 </div>
 
 <div class="card table-wrap">

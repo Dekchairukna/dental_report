@@ -14,14 +14,15 @@
   <p><label>ที่อยู่</label><textarea name="address">{{student.address if student else ''}}</textarea></p>
 
   <h3>หมวดที่ 2 โภชนาการ / ภาวะการเจริญเติบโต</h3>
+  <p class="small"><b>ระบบประเมินอัตโนมัติ</b> จากวันเกิด + เพศ + น้ำหนัก + ส่วนสูง เมื่อกดบันทึก ไม่ต้องเลือกเอง</p>
   <div class="grid">
     <div><label>น้ำหนัก (กก.)</label><input type="number" step="0.1" name="weight" value="{{student.weight if student else ''}}"></div>
     <div><label>ส่วนสูง (ซม.)</label><input type="number" step="0.1" name="height" value="{{student.height if student else ''}}"></div>
     <div><label>รอบเอว (ซม.)</label><input type="number" step="0.1" name="waist" value="{{student.waist if student else ''}}"></div>
     <div><label>สะโพก (ซม.)</label><input type="number" step="0.1" name="hip" value="{{student.hip if student else ''}}"></div>
-    <div><label>นน.อายุ = น้ำหนักตามอายุ</label><select name="growth_weight_age"><option></option>{% for n in growth_wa %}<option {% if student and student.growth_weight_age==n %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div>
-    <div><label>สส.อายุ = ส่วนสูงตามอายุ</label><select name="growth_height_age"><option></option>{% for n in growth_ha %}<option {% if student and student.growth_height_age==n %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div>
-    <div><label>นน.สส. = น้ำหนักตามส่วนสูง</label><select name="growth_weight_height"><option></option>{% for n in growth_wh %}<option {% if student and student.growth_weight_height==n %}selected{% endif %}>{{n}}</option>{% endfor %}</select></div>
+    <div><label>นน.อายุ = น้ำหนักตามอายุ</label><input name="growth_weight_age" value="{{student.growth_weight_age if student else ''}}" readonly placeholder="ระบบจะประเมินเมื่อบันทึก"></div>
+    <div><label>สส.อายุ = ส่วนสูงตามอายุ</label><input name="growth_height_age" value="{{student.growth_height_age if student else ''}}" readonly placeholder="ระบบจะประเมินเมื่อบันทึก"></div>
+    <div><label>นน.สส. = น้ำหนักตามส่วนสูง</label><input name="growth_weight_height" value="{{student.growth_weight_height if student else ''}}" readonly placeholder="ระบบจะประเมินเมื่อบันทึก"></div>
   </div>
 
   {% if not public %}
